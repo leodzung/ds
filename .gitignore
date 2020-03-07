@@ -1,0 +1,14 @@
+# Ignore zip files
+*.zip
+
+# Ignore pickle files
+*.pkl
+
+# Ignore parquet files
+*.parquet
+
+# Ignore python cache
+__pycache__/
+
+# Ignore generated binary files
+*.bin
