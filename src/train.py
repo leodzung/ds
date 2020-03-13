@@ -7,6 +7,7 @@ import sklearn.metrics
 
 from model_dispatcher import MODEL_DISPATCHER
 from dataset import BengaliDatasetTrain
+
 from tqdm import tqdm
 
 from early_stopping import EarlyStopping
@@ -22,11 +23,15 @@ EPOCHS = int(os.environ.get("EPOCHS"))
 TRAIN_BATCH_SIZE = int(os.environ.get("TRAIN_BATCH_SIZE"))
 TEST_BATCH_SIZE = int(os.environ.get("TEST_BATCH_SIZE"))
 
+NUM_WORKERS = int(os.environ.get("NUM_WORKERS"))
+
 MODEL_MEAN = ast.literal_eval(os.environ.get("MODEL_MEAN"))
 MODEL_STD = ast.literal_eval(os.environ.get("MODEL_STD"))
 
-TRAINING_FOLDS = ast.literal_eval(os.environ.get("TRAINING_FOLDS"))
-VALIDATION_FOLDS = ast.literal_eval(os.environ.get("VALIDATION_FOLDS"))
+# TRAINING_FOLDS = ast.literal_eval(os.environ.get("TRAINING_FOLDS"))
+# VALIDATION_FOLDS = ast.literal_eval(os.environ.get("VALIDATION_FOLDS"))
+FOLD = int(os.environ.get("FOLD"))
+
 BASE_MODEL = os.environ.get("BASE_MODEL")
 
 
@@ -151,49 +156,53 @@ def main():
     model.to(DEVICE)
 
     train_dataset = BengaliDatasetTrain(
-        folds=TRAINING_FOLDS,
+        fold=FOLD,
         img_height = IMG_HEIGHT,
         img_width = IMG_WIDTH,
         mean = MODEL_MEAN,
-        std = MODEL_STD
+        std = MODEL_STD,
+        crop = False,
+        train = True
     )
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_dataset,
         batch_size= TRAIN_BATCH_SIZE,
         shuffle=True,
-        num_workers=4
+        num_workers=NUM_WORKERS
     )
 
     valid_dataset = BengaliDatasetTrain(
-        folds=VALIDATION_FOLDS,
+        fold=FOLD,
         img_height = IMG_HEIGHT,
         img_width = IMG_WIDTH,
         mean = MODEL_MEAN,
-        std = MODEL_STD
+        std = MODEL_STD,
+        crop = False,
+        train = False
     )
 
     valid_loader = torch.utils.data.DataLoader(
         dataset=valid_dataset,
         batch_size= TEST_BATCH_SIZE,
         shuffle=True,
-        num_workers=4
+        num_workers=NUM_WORKERS
     )
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=5*1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
                                                             mode="min", 
                                                             patience=5, 
-                                                            factor=0.3,verbose=True)
-
-    early_stopping = EarlyStopping(patience=10, verbose=True)
+                                                            factor=0.3,
+                                                            verbose=True)
+    # early_stopping = EarlyStopping(patience=10, verbose=True)
 
     #if torch.cuda.device_count() > 1:
     #    model = nn.DataParallel(model)
 
     best_score = -1
 
-    print("FOLD : ", VALIDATION_FOLDS[0] )
+    print("FOLD : ", FOLD)
     
     for epoch in range(1, EPOCHS+1):
 
@@ -202,11 +211,9 @@ def main():
 
         scheduler.step(val_loss)
 
-        
-
         if val_score > best_score:
             best_score = val_score
-            torch.save(model.state_dict(), f"{BASE_MODEL}_fold{VALIDATION_FOLDS[0]}_ssr_co.pth")
+            torch.save(model.state_dict(), f"{BASE_MODEL}_fold{FOLD}_ssr_co_noes.pth")
 
         epoch_len = len(str(EPOCHS))
         print_msg = (f'[{epoch:>{epoch_len}}/{EPOCHS:>{epoch_len}}] ' +
@@ -218,11 +225,10 @@ def main():
         
         print(print_msg)
 
-        early_stopping(val_loss, model)
-        if early_stopping.early_stop:
-            print("Early stopping")
-            break
-
+        # early_stopping(val_score, model)
+        # if early_stopping.early_stop:
+        #     print("Early stopping")
+        #     break
 
 if __name__ == "__main__":
     main()

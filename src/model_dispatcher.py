@@ -1,5 +1,5 @@
 import models
 
 MODEL_DISPATCHER = {
-    'resnet34': models.ResNet34
+    'se_resnet50': models.SEResNet50
 }
